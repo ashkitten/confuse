@@ -9,6 +9,7 @@ use std::{
 #[derive(Deserialize)]
 #[serde(untagged)]
 pub enum ConfuseData {
+    Marker,
     List(Vec<Arc<ConfuseData>>),
     Map(HashMap<String, Arc<ConfuseData>>),
     Value(Mutex<Value>),
@@ -18,6 +19,7 @@ pub enum ConfuseData {
 impl ToString for ConfuseData {
     fn to_string(&self) -> String {
         match self {
+            ConfuseData::Marker => "".to_string(),
             ConfuseData::Value(val) => {
                 let val = &*val.lock().unwrap();
                 // TODO: this is a bit hacky
@@ -37,7 +39,7 @@ impl ToString for ConfuseData {
 impl Into<FileType> for &ConfuseData {
     fn into(self) -> FileType {
         match self {
-            ConfuseData::Value(_) => FileType::RegularFile,
+            ConfuseData::Marker | ConfuseData::Value(_) => FileType::RegularFile,
             ConfuseData::List(_) | ConfuseData::Map(_) => FileType::Directory,
         }
     }

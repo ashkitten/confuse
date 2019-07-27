@@ -1,4 +1,4 @@
-use crate::{file_handle::FileHandleMap, data::ConfuseData};
+use crate::{data::ConfuseData, file_handle::FileHandleMap};
 use fuse_mt::{
     DirectoryEntry, FileAttr, FileType, FilesystemMT, RequestInfo, ResultEmpty, ResultEntry,
     ResultOpen, ResultReaddir,
@@ -6,7 +6,6 @@ use fuse_mt::{
 use inotify::{Inotify, WatchMask};
 use libc::c_int;
 use log::info;
-use serde_yaml::Value;
 use std::{
     cell::RefCell,
     cmp,
@@ -72,7 +71,7 @@ impl Confuse {
             match current_data.deref() {
                 ConfuseData::List(list) => {
                     if component == OsStr::new(".list") {
-                        return Ok(Arc::new(ConfuseData::Value(Mutex::new(Value::Null))));
+                        return Ok(Arc::new(ConfuseData::Marker));
                     }
 
                     if let Some(data) = list.get(
@@ -115,6 +114,7 @@ impl FilesystemMT for Confuse {
             ConfuseData::List(list) => list.len() + 3, // ., .., .list
             ConfuseData::Map(map) => map.len() + 2,    // ., ..
             ConfuseData::Value(_) => data.to_string().len(),
+            ConfuseData::Marker => 0,
         } as u64;
 
         let file = File::open(&self.path).unwrap();
@@ -176,6 +176,7 @@ impl FilesystemMT for Confuse {
     ) {
         match self.get_data(path, Some(fh)) {
             Ok(data) => match data.deref() {
+                ConfuseData::Marker => result(Ok(&[])),
                 ConfuseData::Value(_) => {
                     let buf = data.to_string().into_bytes();
                     let buf = &buf[offset as usize..cmp::min(size as usize, buf.len())];
