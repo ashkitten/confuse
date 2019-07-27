@@ -5,7 +5,7 @@ use fuse_mt::{
 };
 use inotify::{Inotify, WatchMask};
 use libc::c_int;
-use log::info;
+use log::{debug, info};
 use std::{
     cell::RefCell,
     cmp,
@@ -120,6 +120,12 @@ impl FilesystemMT for Confuse {
         let file = File::open(&self.path).unwrap();
         let stat = nix::sys::stat::fstat(file.as_raw_fd()).unwrap();
 
+        let mut perm = (stat.st_mode & 0o0777) as u16;
+        if let FileType::Directory = data.deref().into() {
+            // r-- => r-x | r-x => r-x | --x => ---
+            perm ^= (perm & 0o111) ^ ((perm & 0o444) / 4);
+        }
+
         Ok((
             Timespec::new(0, 0),
             FileAttr {
@@ -130,7 +136,7 @@ impl FilesystemMT for Confuse {
                 ctime: Timespec::new(stat.st_ctime, stat.st_ctime_nsec as i32),
                 crtime: Timespec::new(0, 0),
                 kind: data.deref().into(),
-                perm: (stat.st_mode & 0o0777) as u16,
+                perm,
                 nlink: 0,
                 uid: stat.st_uid,
                 gid: stat.st_gid,
